@@ -218,7 +218,15 @@ if (app) {
         </section>
 
         <section class="card analytics-card" id="analytics">
-          <div class="section-heading-row"><div><h3>Dataset Analytics</h3><p>Statistics calculated by the Python backend</p></div></div>
+          <div class="section-heading-row">
+            <div>
+              <h3>📊 Firebase &amp; Soil Moisture Visual Analytics Dashboard</h3>
+              <p>Real-time analytics scorecards and Cloud storage indicators</p>
+            </div>
+            <a href="https://lookerstudio.google.com/" target="_blank" rel="noopener" class="ghost-button" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+              <span>🌐 Open Google Looker Studio</span>
+            </a>
+          </div>
           <div class="analytics-grid">
             <div class="mini-stat"><span class="mini-label">Average Moisture</span><strong id="analytics-average-moisture">—</strong></div>
             <div class="mini-stat"><span class="mini-label">Minimum Moisture</span><strong id="analytics-minimum-moisture">—</strong></div>
@@ -227,7 +235,24 @@ if (app) {
             <div class="mini-stat"><span class="mini-label">Average Humidity</span><strong id="analytics-average-humidity">—</strong></div>
             <div class="mini-stat"><span class="mini-label">Average Target Moisture</span><strong id="analytics-target-moisture">—</strong></div>
           </div>
+
+          <div class="looker-dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 20px;">
+            <div class="card" style="padding: 16px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;">
+              <h4 style="font-size: 14px; margin-bottom: 12px; color: #86efac;">💧 Irrigation &amp; Water Metrics Formula</h4>
+              <div style="font-size: 13px; opacity: 0.8; margin-bottom: 6px;">Water Required per % deficit: <strong>10 ml / kg</strong></div>
+              <div style="font-size: 13px; opacity: 0.8; margin-bottom: 6px;">Water Volume in Liters: <strong>Water_Required_ml / 1000</strong></div>
+              <div style="font-size: 13px; opacity: 0.8;">Pump Execution Runtime: <strong>Water_Required_ml / 5 sec</strong></div>
+            </div>
+            
+            <div class="card" style="padding: 16px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;">
+              <h4 style="font-size: 14px; margin-bottom: 12px; color: #60a5fa;">🔥 Live Firebase REST JSON Feed</h4>
+              <div style="font-size: 12px; font-family: monospace; word-break: break-all; opacity: 0.9; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px;">
+                https://smart-soil-monitor-9f9b0-default-rtdb.firebaseio.com/telemetry/history.json
+              </div>
+            </div>
+          </div>
         </section>
+
 
         <section class="card logs-card" id="system-logs">
           <div class="section-heading-row"><div><h3>System Logs</h3><p>Events recorded by the Python service</p></div></div>
