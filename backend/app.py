@@ -201,6 +201,44 @@ def _decision(moisture: float, target: float | None) -> tuple[str, str]:
     return "TOO WET", "PUMP OFF"
 
 
+def _format_cloud_payload(
+    moisture: float,
+    temperature: float,
+    humidity: float,
+    target: float | None,
+    pump_status: str | None = None,
+    timestamp: str | None = None,
+    row_number: int | None = None,
+) -> dict[str, Any]:
+    status, decision = _decision(float(moisture), target)
+    deficit = max(0.0, (target - float(moisture))) if target is not None else 0.0
+    water_req_ml = round(deficit * 10.0, 2)
+    water_req_l = round(water_req_ml / 1000.0, 4)
+    pump_time_sec = round(water_req_ml / 5.0, 2) if water_req_ml > 0 else 0.0
+    action = "IRRIGATE" if decision == "PUMP ON" else "STANDBY"
+    compressor_status = "ACTIVE" if decision == "PUMP ON" else "OFF"
+
+    payload = {
+        "Temperature": round(float(temperature), 2),
+        "Humidity": round(float(humidity), 2),
+        "Moisture": round(float(moisture), 2),
+        "Target_Moisture": round(float(target), 2) if target is not None else None,
+        "Moisture_Status": status,
+        "Decision": decision,
+        "Action": action,
+        "Water_Required_ml": water_req_ml,
+        "Compressor_Status": compressor_status,
+        "Water_Required_L": water_req_l,
+        "Pump_Time_sec": pump_time_sec,
+        "Pump_Status": pump_status or "UNKNOWN",
+        "timestamp": timestamp or _utc_now(),
+    }
+    if row_number is not None:
+        payload["row_number"] = row_number
+    return payload
+
+
+
 def _json_value(value: Any) -> Any:
     if value is None or pd.isna(value):
         return None
@@ -580,18 +618,18 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
     # Auto-sync uploaded dataset records to Firebase Cloud if configured
     cloud_records = []
     for r in records:
-        cloud_records.append({
-            "row_number": r[0],
-            "timestamp": r[1] or uploaded_at,
-            "moisture": r[2],
-            "temperature": r[3],
-            "humidity": r[4],
-            "target_moisture": r[5],
-            "moisture_status": r[6],
-            "pump_decision": r[7],
-            "source": "dataset",
-        })
+        cloud_records.append(
+            _format_cloud_payload(
+                row_number=r[0],
+                timestamp=r[1] or uploaded_at,
+                moisture=r[2],
+                temperature=r[3],
+                humidity=r[4],
+                target=r[5],
+            )
+        )
     _sync_bulk_to_firebase(cloud_records)
+
 
     return {
         "message": "Dataset processed and synced successfully.",
@@ -785,18 +823,14 @@ def receive_sensor_reading(reading: SensorReading) -> dict[str, Any]:
             )
     
     # Sync to Cloud (Firebase Realtime DB)
-    cloud_payload = {
-        "moisture": reading.moisture,
-        "temperature": reading.temperature,
-        "humidity": reading.humidity,
-        "target_moisture": target,
-        "moisture_status": status,
-        "pump_decision": decision,
-        "pump_status": reading.pump_status or "UNKNOWN",
-        "sensor_status": reading.sensor_status,
-        "timestamp": timestamp,
-        "last_updated": received_at,
-    }
+    cloud_payload = _format_cloud_payload(
+        moisture=reading.moisture,
+        temperature=reading.temperature,
+        humidity=reading.humidity,
+        target=target,
+        pump_status=reading.pump_status,
+        timestamp=timestamp,
+    )
     _sync_to_firebase(cloud_payload)
 
     return {"message": "Sensor reading stored.", "dashboard": dashboard()}
@@ -947,17 +981,14 @@ def sync_latest_to_cloud() -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="No sensor telemetry available to sync to cloud.")
     
     reading = dash["latest_reading"]
-    payload = {
-        "moisture": reading["moisture"],
-        "temperature": reading["temperature"],
-        "humidity": reading["humidity"],
-        "target_moisture": reading["target_moisture"],
-        "moisture_status": reading["moisture_status"],
-        "pump_decision": reading["pump_decision"],
-        "pump_status": reading.get("pump_status") or "UNKNOWN",
-        "timestamp": reading["timestamp"],
-        "last_updated": _utc_now(),
-    }
+    payload = _format_cloud_payload(
+        moisture=reading["moisture"],
+        temperature=reading["temperature"],
+        humidity=reading["humidity"],
+        target=reading["target_moisture"],
+        pump_status=reading.get("pump_status"),
+        timestamp=reading["timestamp"],
+    )
     success = _sync_to_firebase(payload)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to sync to Firebase Cloud. Please check your Database URL.")
@@ -975,18 +1006,17 @@ def sync_all_to_cloud() -> dict[str, Any]:
     records = []
     for r in rows:
         reading_dict = _reading(r)
-        records.append({
-            "id": reading_dict["id"],
-            "timestamp": reading_dict["timestamp"] or reading_dict.get("created_at"),
-            "moisture": reading_dict["moisture"],
-            "temperature": reading_dict["temperature"],
-            "humidity": reading_dict["humidity"],
-            "target_moisture": reading_dict["target_moisture"],
-            "moisture_status": reading_dict["moisture_status"],
-            "pump_decision": reading_dict["pump_decision"],
-            "pump_status": reading_dict.get("pump_status") or "UNKNOWN",
-            "source": reading_dict["source"],
-        })
+        records.append(
+            _format_cloud_payload(
+                moisture=reading_dict["moisture"],
+                temperature=reading_dict["temperature"],
+                humidity=reading_dict["humidity"],
+                target=reading_dict["target_moisture"],
+                pump_status=reading_dict.get("pump_status"),
+                timestamp=reading_dict["timestamp"] or reading_dict.get("created_at"),
+                row_number=reading_dict.get("row_number"),
+            )
+        )
     
     success = _sync_bulk_to_firebase(records)
     if not success:
@@ -996,5 +1026,6 @@ def sync_all_to_cloud() -> dict[str, Any]:
 
 
 _initialize_database()
+
 
 
